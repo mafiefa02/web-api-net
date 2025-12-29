@@ -87,7 +87,22 @@ public class AuthService(AppDbContext context, IConfiguration configuration) : I
         }
 
         var user = await context.Users.FirstOrDefaultAsync(u => u.Username == username);
-        if (user == null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpiryTime <= DateTime.UtcNow)
+
+        if (user == null)
+        {
+            throw new SecurityTokenException("Invalid access token or refresh token");
+        }
+
+        if (user.RefreshToken != request.RefreshToken)
+        {
+            user.RefreshToken = null;
+            user.RefreshTokenExpiryTime = DateTime.MinValue;
+            await context.SaveChangesAsync();
+
+            throw new SecurityTokenException("Invalid access token or refresh token");
+        }
+
+        if (user.RefreshTokenExpiryTime <= DateTime.UtcNow)
         {
             throw new SecurityTokenException("Invalid access token or refresh token");
         }
