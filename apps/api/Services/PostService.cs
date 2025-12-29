@@ -9,6 +9,7 @@ public interface IPostService
     Task<IEnumerable<Post>> GetAllPostsAsync();
     Task<Post> GetPostByIdAsync(int id);
     Task<Post> CreatePostAsync(string content, string userId, int? parentId = null);
+    Task DeletePostAsync(int id, string userId);
 }
 
 public class PostService(AppDbContext context) : IPostService
@@ -23,10 +24,11 @@ public class PostService(AppDbContext context) : IPostService
             .Select(p => new Post
             {
                 Id = p.Id,
-                Content = p.Content,
+                Content = p.IsDeleted ? "[deleted]" : p.Content,
                 CreatedAt = p.CreatedAt,
                 UserId = p.UserId,
-                User = p.User,
+                User = p.IsDeleted ? null : p.User,
+                IsDeleted = p.IsDeleted,
                 CommentsCount = p.Replies != null ? p.Replies.Count() : 0,
                 Replies = null
             })
@@ -41,18 +43,33 @@ public class PostService(AppDbContext context) : IPostService
             .Select(p => new Post
             {
                 Id = p.Id,
-                Content = p.Content,
+                Content = p.IsDeleted ? "[deleted]" : p.Content,
                 CreatedAt = p.CreatedAt,
                 UserId = p.UserId,
-                User = p.User,
+                User = p.IsDeleted ? null : p.User,
+                IsDeleted = p.IsDeleted,
+                ParentId = p.ParentId,
+                Parent = p.Parent == null ? null : new Post
+                {
+                    Id = p.Parent.Id,
+                    Content = p.Parent.IsDeleted ? "[deleted]" : p.Parent.Content,
+                    CreatedAt = p.Parent.CreatedAt,
+                    UserId = p.Parent.UserId,
+                    User = p.Parent.IsDeleted ? null : p.Parent.User,
+                    IsDeleted = p.Parent.IsDeleted,
+                    CommentsCount = p.Parent.Replies != null ? p.Parent.Replies.Count() : 0,
+                    ParentId = p.Parent.ParentId,
+                    Replies = null
+                },
                 CommentsCount = p.Replies != null ? p.Replies.Count() : 0,
                 Replies = p.Replies != null ? p.Replies.Select(r => new Post
                 {
                     Id = r.Id,
-                    Content = r.Content,
+                    Content = r.IsDeleted ? "[deleted]" : r.Content,
                     CreatedAt = r.CreatedAt,
                     UserId = r.UserId,
-                    User = r.User,
+                    User = r.IsDeleted ? null : r.User,
+                    IsDeleted = r.IsDeleted,
                     CommentsCount = r.Replies != null ? r.Replies.Count() : 0,
                     Replies = null
                 }).ToList() : null
@@ -71,7 +88,7 @@ public class PostService(AppDbContext context) : IPostService
     {
         if (parentId.HasValue)
         {
-            var parentExists = await context.Posts.AnyAsync(p => p.Id == parentId.Value);
+            var parentExists = await context.Posts.AnyAsync(p => p.Id == parentId.Value && !p.IsDeleted);
             if (!parentExists)
             {
                 throw new KeyNotFoundException($"Parent post with id {parentId.Value} not found.");
@@ -89,5 +106,33 @@ public class PostService(AppDbContext context) : IPostService
         await context.SaveChangesAsync();
 
         return post;
+    }
+
+    public async Task DeletePostAsync(int id, string userId)
+    {
+        var post = await context.Posts
+            .Include(p => p.Replies)
+            .FirstOrDefaultAsync(p => p.Id == id);
+
+        if (post == null)
+        {
+            throw new KeyNotFoundException($"Post with id {id} not found.");
+        }
+
+        if (post.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to delete this post.");
+        }
+
+        if (post.Replies != null && post.Replies.Any())
+        {
+            post.IsDeleted = true;
+        }
+        else
+        {
+            context.Posts.Remove(post);
+        }
+
+        await context.SaveChangesAsync();
     }
 }

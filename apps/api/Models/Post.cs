@@ -14,6 +14,8 @@ public class Post
     public required string UserId { get; set; }
     public User? User { get; set; }
 
+    public bool IsDeleted { get; set; } = false;
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ParentId { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

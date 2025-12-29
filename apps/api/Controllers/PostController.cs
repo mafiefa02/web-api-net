@@ -48,4 +48,25 @@ public class PostController(IPostService postService) : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeletePost(int id)
+    {
+        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId == null) return Unauthorized();
+
+        try
+        {
+            await postService.DeletePostAsync(id, userId);
+            return NoContent();
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Forbid();
+        }
+    }
 }
