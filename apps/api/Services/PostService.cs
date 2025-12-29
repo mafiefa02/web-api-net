@@ -9,6 +9,7 @@ public interface IPostService
     Task<IEnumerable<Post>> GetAllPostsAsync();
     Task<Post> GetPostByIdAsync(int id);
     Task<Post> CreatePostAsync(string content, string userId, int? parentId = null);
+    Task<Post> UpdatePostAsync(int id, string content, string userId);
     Task DeletePostAsync(int id, string userId);
 }
 
@@ -103,6 +104,31 @@ public class PostService(AppDbContext context) : IPostService
         };
 
         context.Posts.Add(post);
+        await context.SaveChangesAsync();
+
+        return post;
+    }
+
+    public async Task<Post> UpdatePostAsync(int id, string content, string userId)
+    {
+        var post = await context.Posts.FirstOrDefaultAsync(p => p.Id == id);
+
+        if (post == null)
+        {
+            throw new KeyNotFoundException($"Post with id {id} not found.");
+        }
+
+        if (post.IsDeleted)
+        {
+            throw new InvalidOperationException("Cannot edit a deleted post.");
+        }
+
+        if (post.UserId != userId)
+        {
+            throw new UnauthorizedAccessException("You are not authorized to edit this post.");
+        }
+
+        post.Content = content;
         await context.SaveChangesAsync();
 
         return post;

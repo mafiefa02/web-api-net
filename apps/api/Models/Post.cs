@@ -33,3 +33,8 @@ public class CreatePostDto
     public required string Content { get; set; }
     public int? ParentId { get; set; }
 }
+
+public class UpdatePostDto
+{
+    public required string Content { get; set; }
+}
