@@ -1,17 +1,21 @@
-# Use the SDK image for building the application
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-WORKDIR /app
+WORKDIR /src
 
-# Copy csproj and restore as distinct layers
-COPY *.csproj ./
-RUN dotnet restore
+COPY ["api.csproj", "./"]
+RUN dotnet restore "api.csproj"
 
-# Copy everything else and build
 COPY . .
-RUN dotnet publish -c Release -o out
 
-# Build runtime image
+RUN dotnet publish "api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
-COPY --from=build /app/out .
+
+EXPOSE 8080
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+COPY --from=build /app/publish .
+
 ENTRYPOINT ["dotnet", "api.dll"]
